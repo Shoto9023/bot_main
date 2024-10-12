@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+Settings.py
+functions.py
+reboot_server.sh
+7dtd_logo.png
+tts-mesugaki-865604b60d28.json
