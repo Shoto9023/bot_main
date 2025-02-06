@@ -404,6 +404,40 @@ async def voice(ctx: SlashContext, command: str, channel: int):
         ctx.send("実装されていません")
 
 
+#CTXCommand : vc_raid
+#ボイスチャンネル操作(メンバーのレイド)
+@slash_command(
+    name="raid",
+    description="メンバーをソースチャンネルからターゲットチャンネルへレイドします",
+    scopes=target_guilds,
+)
+@slash_option(
+    name="source_ch",
+    description="レイド元",
+    required=True,
+    opt_type=OptionType.CHANNEL,
+    channel_types=[ChannelType.GUILD_VOICE],
+)
+@slash_option(
+    name="target_ch",
+    description="レイド先",
+    required=True,
+    opt_type=OptionType.CHANNEL,
+    channel_types=[ChannelType.GUILD_VOICE],
+)
+async def vc_raid(ctx:SlashContext, source_ch:int, target_ch:int):
+    log(f"requested command: raid, Options: {source_ch.name}, {target_ch.name}")
+    await ctx.defer()
+    refused_members = []
+    for member in source_ch.voice_members:
+        if member.voice:
+            await member.move(target_ch) if member in target_ch.members else refused_members.append(member)
+    member_names = [v.display_name for v in refused_members]
+    if refused_members:
+        await ctx.send(f"以下のメンバーは権限が一致していないため移動しませんでした。\n権限がないメンバーを移動させたい場合は手動で移動してください\n\n- {member_names.join("\n- ")}")
+    else:
+        await ctx.send(f"{source_ch.name}内の全てのメンバーを{target_ch.name}へレイドしました")
+
 #CTXCommand : tts_dictionary
 #TTSで利用する辞書内容の変更コマンド
 @slash_command(
