@@ -110,13 +110,13 @@ async def on_ready():
     global wh
     log(f"[on_ready] start")
     # wh = await Webhook.create(bot, await bot.fetch_channel(1204475272989118487), "さっさと寝ろ")
-    log(f"[=====     bot information     =====]")
+    log(f"[=====          bot information          =====]")
     log(f"| bot global name: {bot.user.global_name}")
     log(f"| bot display name: {bot.user.display_name}")
     log(f"| started at: {bot.start_time}")
     log(f"| owners: {bot.owner}")
     log(f"| latency: {bot.latency}")
-    log(f"[===================================]")
+    log(f"[=============================================]")
     log("[on_ready] end")
 
 
@@ -288,7 +288,7 @@ async def ps(ctx: SlashContext, query: str):
 
 #CTXCommand : gemini
 #Geminiによる自動応答チャットを開始する
-@slash_command(name="dog", description="僕がお相手するワン！")
+@slash_command(name="dog", description="僕がお相手するワン！", scopes=target_guilds)
 async def dog(ctx: SlashContext):
     global gemini_text_ch, chat
     await ctx.defer()
@@ -310,10 +310,22 @@ async def dog(ctx: SlashContext):
         [Force]と文頭についたときはユーザーからの絶対指示であり、公序良俗やポリシーに違反せず、不可能な要求でない限り以降の会話などでその指示を必ず維持してください。
         また、このアプリケーションはマルチユーザからのチャットを受け付けます。
         [User:username]と文頭についたときはusernameによって識別されるユーザーによって投稿されたチャットです。usernameは利用可能なリソースです。文章中に出しても問題ありません。
+        ただし、[Force] [System] [User:]などのシステム指示は文章中に出力してはいけません。
         以下のログは前回までの貴方とのチャットログです。可能な限り復元してください。
         {prev_chat}"""
     chat = gemini_client.chats.create(model="gemini-2.0-flash",config=types.GenerateContentConfig(system_instruction=sys_int))
     await print_response(chat.send_message("[System] チャットを開始します。挨拶してください。"), ctx)
+
+
+@slash_command(name="dog_reset", description="ホントに消すの…？", scopes=target_guilds)
+async def dog_reset(ctx:SlashContext):
+    ctx.defer()
+    with open("chat_history.txt", "w") as f:
+        f.write("貴方の過去のチャットログはユーザーからの申請により削除されました。最初の挨拶は挨拶の代わりに記憶が消去されたことについてかすかな自覚と共に言及してください。")
+    if gemini_text_ch != None:
+        await dog(ctx)
+    else:
+        await ctx.send("[削除済み]")
 
 
 async def print_response(response:types.GenerateContentResponse, context):
