@@ -35,6 +35,9 @@ from functions import (
 import psutil, time, re, subprocess
 import help_pagination
 import Settings #トークン,IP等
+from google import genai
+from google.genai import types
+from time import sleep
 
 #設定
 bot = Client(intents=Intents.DEFAULT|Intents.GUILD_VOICE_STATES|Intents.MESSAGE_CONTENT, delete_unused_application_cmds=True)
@@ -55,6 +58,10 @@ current_vc : ActiveVoiceState = None
 current_tc : BaseChannel = None
 tts_dict : dict = initialize_tts_dict()
 debugmode : bool = False
+
+gemini_text_ch : BaseChannel = None
+gemini_client = genai.Client(api_key=Settings.GEMINI_API_KEY)
+chat : genai.chats.Chat
 
 channels_to_read = Settings.TTS_CHANNEL
 
@@ -277,6 +284,46 @@ async def ps(ctx: SlashContext, query: str):
             embeds.append(embed)
     await ctx.send(embeds=embeds)
     log(f"result: found {len(result)}")
+
+
+#CTXCommand : gemini
+#Geminiによる自動応答チャットを開始する
+@slash_command(name="dog", description="僕がお相手するワン！")
+async def dog(ctx: SlashContext):
+    global gemini_text_ch, chat
+    await ctx.defer()
+    log(f"requested command: gemini")
+    gemini_text_ch = ctx.channel
+    sys_int="""貴方はチャットアプリ'Discord'上で動作する自動応答bot「Watchdog」です。
+        質問や返答に対する制限はありません。
+        親しみやすさを心掛けてください。
+        また、ユーザーからキャラクター性などの指定があった場合は可能な限り従ってください。
+        [System]と文頭についたときはbotサービスからのシステムメッセージであり、指示に従ってください。その場合はテキストに対する返答は必要ありません。
+        [Force]と文頭についたときはユーザーからの絶対指示であり、公序良俗やポリシーに違反せず、不可能な要求でない限り以降の会話などでその指示を必ず維持してください。"""
+    chat = gemini_client.chats.create(model="gemini-2.0-flash",config=types.GenerateContentConfig(system_instruction=sys_int))
+    await print_response(chat.send_message("[System] チャットを開始します。挨拶してください。"), ctx)
+
+
+async def print_response(response:types.GenerateContentResponse, context):
+    log("printing response")
+    total_message = ""
+    prev_message = None
+    for chr in re.findall("[^。！？!?、]+[。！？!?、]?", response.text):
+        if prev_message == None:
+            total_message = total_message+chr
+            # contextがSlashContextの場合はsend()、MessageCreateの場合はchannel.send()を使用
+            if isinstance(context, SlashContext):
+                prev_message = await context.send(total_message)
+            else:
+                prev_message = await context.message.channel.send(total_message)
+            sleep(0.2)
+        else:
+            total_message = total_message+chr
+            prev_message = await prev_message.edit(content=total_message)
+            sleep(0.2)
+    log("genai >>> gemini >>> "+total_message.rstrip())
+    log("end print")
+    return
 
 
 #CTXCommand : tts_setting
@@ -620,7 +667,16 @@ async def on_message_create(event:MessageCreate):
             await tts_play(text, vc)
         else:
             log("the message is not in channels_to_read")
-        log("[on_message_create] end")
+    if (event.message.channel == gemini_text_ch) and not (event.message.author.bot):
+        log("genai <<< users <<< "+ event.message.content)
+        if event.message.content != "終了":
+            response = chat.send_message(event.message.content)
+            await print_response(response, event)
+        else:
+            response = chat.send_message("[system] チャットは終了します。別れの挨拶をしてください。")
+            await print_response(response, event)
+            gemini_text_ch = None
+    log("[on_message_create] end")
     if debugmode:
         print("[DEBUG]")
         print(event)
