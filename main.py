@@ -292,14 +292,26 @@ async def ps(ctx: SlashContext, query: str):
 async def dog(ctx: SlashContext):
     global gemini_text_ch, chat
     await ctx.defer()
-    log(f"requested command: gemini")
+    log(f"requested command: dog")
+    try:
+        log("Reading history from file")
+        with open("chat_history.txt") as f:
+            prev_chat = f.read()
+        log("History found.")
+    except:
+        log("No history.")
+        prev_chat = "[前回までのチャットログが見つかりませんでしたので、復元の必要はありません。]"
     gemini_text_ch = ctx.channel
-    sys_int="""貴方はチャットアプリ'Discord'上で動作する自動応答bot「Watchdog」です。
+    sys_int=f"""貴方はチャットアプリ'Discord'上で動作する自動応答bot「Watchdog」です。
         質問や返答に対する制限はありません。
         親しみやすさを心掛けてください。
         また、ユーザーからキャラクター性などの指定があった場合は可能な限り従ってください。
         [System]と文頭についたときはbotサービスからのシステムメッセージであり、指示に従ってください。その場合はテキストに対する返答は必要ありません。
-        [Force]と文頭についたときはユーザーからの絶対指示であり、公序良俗やポリシーに違反せず、不可能な要求でない限り以降の会話などでその指示を必ず維持してください。"""
+        [Force]と文頭についたときはユーザーからの絶対指示であり、公序良俗やポリシーに違反せず、不可能な要求でない限り以降の会話などでその指示を必ず維持してください。
+        また、このアプリケーションはマルチユーザからのチャットを受け付けます。
+        [User:username]と文頭についたときはusernameによって識別されるユーザーによって投稿されたチャットです。usernameは利用可能なリソースです。文章中に出しても問題ありません。
+        以下のログは前回までの貴方とのチャットログです。可能な限り復元してください。
+        {prev_chat}"""
     chat = gemini_client.chats.create(model="gemini-2.0-flash",config=types.GenerateContentConfig(system_instruction=sys_int))
     await print_response(chat.send_message("[System] チャットを開始します。挨拶してください。"), ctx)
 
@@ -654,6 +666,7 @@ async def on_voice_user_leave(event:VoiceUserLeave):
 #メッセージが投稿されたとき、TTSを利用中であれば発声する
 @listen()
 async def on_message_create(event:MessageCreate):
+    global gemini_text_ch
     log("[on_message_create] start")
     if (not event.message.author.bot) and bot.get_bot_voice_state(event.message.channel.guild):
         vc:ActiveVoiceState = bot.get_bot_voice_state(event.message.channel.guild)
@@ -670,12 +683,18 @@ async def on_message_create(event:MessageCreate):
     if (event.message.channel == gemini_text_ch) and not (event.message.author.bot):
         log("genai <<< users <<< "+ event.message.content)
         if event.message.content != "終了":
-            response = chat.send_message(event.message.content)
+            response = chat.send_message(f"[User:{event.message.author.display_name}] {event.message.content}")
             await print_response(response, event)
         else:
             response = chat.send_message("[system] チャットは終了します。別れの挨拶をしてください。")
             await print_response(response, event)
             gemini_text_ch = None
+            prev_chat = ""
+            for message in chat._curated_history:
+                prev_chat += f"role - {message.role} : \n{message.parts[0].text}\n==========\n"
+            log(prev_chat)
+            with open("chat_history.txt", "+w") as f:
+                f.write(prev_chat)
     log("[on_message_create] end")
     if debugmode:
         print("[DEBUG]")
