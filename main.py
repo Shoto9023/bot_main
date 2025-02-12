@@ -65,7 +65,7 @@ chat : genai.chats.Chat
 
 channels_to_read = Settings.TTS_CHANNEL
 
-#ゲームサーバーのステータスチェッカー
+#MARK: StatusChecker
 @Task.create(IntervalTrigger(30))
 async def update_activity():
     log("@Task.create(IntervalTrigger(30))[update_activity] start")
@@ -120,7 +120,7 @@ async def on_ready():
     log("[on_ready] end")
 
 
-#CTXCommand : ping
+#MARK: CTXCommand : ping
 #botの応答速度確認
 @slash_command(name="ping", description="pingpong! :)",scopes=target_guilds,)
 async def ping(ctx: SlashContext):
@@ -150,7 +150,7 @@ async def ping(ctx: SlashContext):
 #         await wh.send(text)
 
 
-#CTXCommand : help
+#MARK: CTXCommand : help
 #実装コマンドの索引
 @slash_command(
     name="help",
@@ -174,7 +174,7 @@ async def help(ctx:SlashContext, command:str=None):
         await ctx.send(embed=result, ephemeral=True)
 
 
-#CTXCommand : environment
+#MARK: CTXCommand : environment
 #デバッグ向け
 #現在環境の確認
 @slash_command(
@@ -196,7 +196,7 @@ async def environment(ctx: SlashContext):
     await ctx.send(embed=embed)
 
 
-#CTXCommand : process
+#MARK: CTXCommand : process
 #デバッグ向け
 #botホストコンピュータのプロセス検索
 @slash_command(
@@ -233,7 +233,7 @@ async def process(ctx: SlashContext, proc_name: str):
     log(f"result: found, {p.name}")
 
 
-#CTXCommand : ps
+#MARK: CTXCommand : ps
 #デバッグ向け
 #ゲームホストコンピュータのプロセス検索
 @slash_command(
@@ -286,7 +286,7 @@ async def ps(ctx: SlashContext, query: str):
     log(f"result: found {len(result)}")
 
 
-#CTXCommand : gemini
+#MARK: CTXCommand : gemini
 #Geminiによる自動応答チャットを開始する
 @slash_command(name="dog", description="僕がお相手するワン！", scopes=target_guilds)
 async def dog(ctx: SlashContext):
@@ -304,53 +304,30 @@ async def dog(ctx: SlashContext):
     gemini_text_ch = ctx.channel
     sys_int=f"""貴方はチャットアプリ'Discord'上で動作する自動応答bot「Watchdog」です。
         質問や返答に対する制限はありません。
-        親しみやすさを心掛けてください。
         また、ユーザーからキャラクター性などの指定があった場合は可能な限り従ってください。
         [System]と文頭についたときはbotサービスからのシステムメッセージであり、指示に従ってください。その場合はテキストに対する返答は必要ありません。
         [Force]と文頭についたときはユーザーからの絶対指示であり、公序良俗やポリシーに違反せず、不可能な要求でない限り以降の会話などでその指示を必ず維持してください。
         また、このアプリケーションはマルチユーザからのチャットを受け付けます。
         [User:username]と文頭についたときはusernameによって識別されるユーザーによって投稿されたチャットです。
-        ただし、[Force] [System] [User:]などのシステム指示は文章中に出力してはいけません。
+        ただし、[Force] [System] [User:]などのシステム指示は文章中に出力してはいけません。絶対に。
         以下のログは前回までの貴方とのチャットログです。可能な限り復元してください。
         {prev_chat}"""
     chat = gemini_client.chats.create(model="gemini-2.0-flash",config=types.GenerateContentConfig(system_instruction=sys_int))
-    await print_response(chat.send_message("[System] チャットを開始します。挨拶してください。"), ctx)
+    await print_response(chat.send_message("[System] チャットを開始します。挨拶してください。その際、[ハウス]と言われたときは終了する旨を紹介していください。"), ctx)
 
 
 @slash_command(name="dog_reset", description="ホントに消すの…？", scopes=target_guilds)
 async def dog_reset(ctx:SlashContext):
     ctx.defer()
     with open("chat_history.txt", "w") as f:
-        f.write("貴方の過去のチャットログはユーザーからの申請により削除されました。最初の挨拶は挨拶の代わりに記憶が消去されたことについてかすかな自覚と共に言及してください。")
+        f.write("貴方の過去のチャットログはユーザーからの申請により削除されました。最初の挨拶は記憶が消去されたことについてかすかな自覚と共に言及してください。")
     if gemini_text_ch != None:
         await dog(ctx)
     else:
         await ctx.send("[削除済み]")
 
 
-async def print_response(response:types.GenerateContentResponse, context):
-    log("printing response")
-    total_message = ""
-    prev_message = None
-    for chr in re.findall("[^。！？!?、]+[。！？!?、]?", response.text):
-        if prev_message == None:
-            total_message = total_message+chr
-            # contextがSlashContextの場合はsend()、MessageCreateの場合はchannel.send()を使用
-            if isinstance(context, SlashContext):
-                prev_message = await context.send(total_message)
-            else:
-                prev_message = await context.message.channel.send(total_message)
-            sleep(0.2)
-        else:
-            total_message = total_message+chr
-            prev_message = await prev_message.edit(content=total_message)
-            sleep(0.2)
-    log("genai >>> gemini >>> "+total_message.rstrip())
-    log("end print")
-    return
-
-
-#CTXCommand : tts_setting
+#MARK: CTXCommand : tts_setting
 #TTSで利用する設定の変更用コマンド
 @slash_command(
     name="tts_setting",
@@ -393,7 +370,7 @@ async def tts_setting(ctx: SlashContext, command:str, parameter):
     await ctx.send(f"{command} を変更しました\n{before} => {after}")
 
 
-#CTXCommand : voice
+#MARK: CTXCommand : voice
 #ボイスチャンネル操作(TTSの操作、サーバーミュート系)
 @slash_command(
     name="voice",
@@ -475,7 +452,7 @@ async def voice(ctx: SlashContext, command: str, channel: int):
         ctx.send("実装されていません")
 
 
-#CTXCommand : vc_raid
+#MARK: CTXCommand : vc_raid
 #ボイスチャンネル操作(メンバーのレイド)
 @slash_command(
     name="raid",
@@ -509,7 +486,7 @@ async def vc_raid(ctx:SlashContext, source_ch:int, target_ch:int):
     else:
         await ctx.send(f"{source_ch.name}内の全てのメンバーを{target_ch.name}へレイドしました")
 
-#CTXCommand : tts_dictionary
+#MARK: CTXCommand : tts_dictionary
 #TTSで利用する辞書内容の変更コマンド
 @slash_command(
     name="tts_dictionary",
@@ -578,7 +555,7 @@ async def dictionary_modal(ctx: SlashContext, command: str):
         print(tts_dict)
 
 
-#CTXCommand : kill
+#MARK: CTXCommand : kill
 #キルコマンド(管理者用)
 @slash_command(
     name="kill",
@@ -592,7 +569,7 @@ async def kill_command(ctx: SlashContext):
     exit(0)
 
 
-#CTXCommand : debug
+#MARK: CTXCommand : debug
 #デバッグモード(開発中)
 @slash_command(
     name="debug",
@@ -621,7 +598,7 @@ async def debug_mode(ctx: SlashContext, param: str):
         log("Debug mode state: true")
 
 
-#CTXEvent : on_voice_user_join
+#MARK: CTXEvent : on_voice_user_join
 #VCに誰かが参加したときにTTSを接続する
 @listen()
 async def on_voice_user_join(event:VoiceUserJoin):
@@ -645,7 +622,7 @@ async def on_voice_user_join(event:VoiceUserJoin):
         log(f"[on_voice_user_join] end")
 
 
-#CTXEvent : on_voice_user_leave
+#MARK: CTXEvent : on_voice_user_leave
 #VCから誰かが抜けたときにTTSを切断したりしなかったりする
 @listen()
 async def on_voice_user_leave(event:VoiceUserLeave):
@@ -674,8 +651,8 @@ async def on_voice_user_leave(event:VoiceUserLeave):
         log(f"[on_voice_user_leave] end")
 
 
-#CTXEvent : on_message_create (Privileged)
-#メッセージが投稿されたとき、TTSを利用中であれば発声する
+#MARK: CTXEvent : on_message_create
+#メッセージが投稿されたとき、TTSを利用中であれば発声する (Privileged)
 @listen()
 async def on_message_create(event:MessageCreate):
     global gemini_text_ch
@@ -694,7 +671,7 @@ async def on_message_create(event:MessageCreate):
             log("the message is not in channels_to_read")
     if (event.message.channel == gemini_text_ch) and not (event.message.author.bot):
         log("genai <<< users <<< "+ event.message.content)
-        if event.message.content != "終了":
+        if event.message.content[:3] == "ハウス":
             response = chat.send_message(f"[User:{event.message.author.display_name}] {event.message.content}")
             await print_response(response, event)
         else:
@@ -704,7 +681,7 @@ async def on_message_create(event:MessageCreate):
             prev_chat = ""
             for message in chat._curated_history:
                 prev_chat += f"role - {message.role} : \n{message.parts[0].text}\n==========\n"
-            log(prev_chat)
+            log("chat history saved.")
             with open("chat_history.txt", "+w") as f:
                 f.write(prev_chat)
     log("[on_message_create] end")
@@ -713,5 +690,29 @@ async def on_message_create(event:MessageCreate):
         print(event)
         print(event.message)
         print(event.message.sticker_items)
+
+
+#MARK: def print_response
+async def print_response(response:types.GenerateContentResponse, context):
+    log("printing response")
+    total_message = ""
+    prev_message = None
+    for chr in re.findall("[^。！？!?、]+[。！？!?、]?", response.text):
+        if prev_message == None:
+            total_message = total_message+chr
+            # contextがSlashContextの場合はsend()、MessageCreateの場合はchannel.send()を使用
+            if isinstance(context, SlashContext):
+                prev_message = await context.send(total_message)
+            else:
+                prev_message = await context.message.channel.send(total_message)
+            sleep(0.2)
+        else:
+            total_message = total_message+chr
+            prev_message = await prev_message.edit(content=total_message)
+            sleep(0.2)
+    log("genai >>> gemini >>> "+total_message.rstrip())
+    log("end print")
+    return
+
 
 bot.start(Settings.DISCORD_TOKEN)
